@@ -576,121 +576,56 @@
 
     <script>
 (function () {
-  /* Skip on touch devices */
-  if (!window.matchMedia('(hover: hover)').matches) return;
-
   const dot   = document.getElementById('curDot');
   const ring  = document.getElementById('curRing');
   const trail = document.getElementById('curTrail');
   const blob  = document.getElementById('curBlob');
   const label = document.getElementById('curLabel');
 
+  const isTouch  = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  const isMouse  = !isTouch;
+
   let mx = -300, my = -300;
   let rx = mx, ry = my;
   let tx = mx, ty = my;
   let bx = mx, by = my;
+  let holdTimer = null;
+  let isVisible = false;
 
-  /* ── Mouse position ── */
-  document.addEventListener('mousemove', e => {
-    mx = e.clientX;
-    my = e.clientY;
-    label.style.left = mx + 'px';
-    label.style.top  = (my + 30) + 'px';
-  });
-
-  /* ── rAF lerp loop ── */
-  const RING_EASE  = 0.11;   /* increase = faster ring */
-  const TRAIL_EASE = 0.055;  /* increase = tighter trail */
-  const BLOB_EASE  = 0.055;
-
-  (function tick() {
-    rx += (mx - rx) * RING_EASE;
-    ry += (my - ry) * RING_EASE;
-    tx += (mx - tx) * TRAIL_EASE;
-    ty += (my - ty) * TRAIL_EASE;
-    bx += (mx - bx) * BLOB_EASE;
-    by += (my - by) * BLOB_EASE;
-
-    dot.style.left   = mx + 'px'; dot.style.top   = my + 'px';
-    ring.style.left  = rx + 'px'; ring.style.top  = ry + 'px';
-    trail.style.left = tx + 'px'; trail.style.top = ty + 'px';
-    blob.style.left  = bx + 'px'; blob.style.top  = by + 'px';
-
-    requestAnimationFrame(tick);
-  })();
-
-  /* ── Magnetic pull ── */
-  const STRENGTH = 0.36;
-
-  document.querySelectorAll('[data-magnetic]').forEach(el => {
-    el.addEventListener('mousemove', e => {
-      const r  = el.getBoundingClientRect();
-      const cx = r.left + r.width  / 2;
-      const cy = r.top  + r.height / 2;
-      el.style.transform = `translate(${(e.clientX - cx) * STRENGTH}px, ${(e.clientY - cy) * STRENGTH}px)`;
-    });
-    el.addEventListener('mouseleave', () => {
-      el.style.transform = '';
-    });
-  });
-
-  /* ── Hover detection ── */
-  const HOVER_SEL = 'a[href], button, [role="button"], .btn, .nav-link, .project-card, .badge, [data-magnetic]';
-  const TEXT_SEL  = 'input, textarea, [contenteditable]';
-  const ALL_SEL   = HOVER_SEL + ', ' + TEXT_SEL + ', label, select, .glass';
-
-  document.addEventListener('mouseover', e => {
-    const el = e.target.closest(ALL_SEL);
-    if (!el) return;
-    const isText = !!e.target.closest(TEXT_SEL);
-    dot.classList.toggle('is-text',    isText);
-    ring.classList.toggle('is-text',   isText);
-    dot.classList.toggle('is-hovering',  !isText);
-    ring.classList.toggle('is-hovering', !isText);
-
-    /* Label: data-label attr or aria-label or title */
-    const lbl = el.dataset.label
-      || el.getAttribute('aria-label')
-      || el.getAttribute('title');
-    if (lbl) { label.textContent = lbl; label.classList.add('visible'); }
-  });
-
-  document.addEventListener('mouseout', e => {
-    if (!e.target.closest(ALL_SEL)) return;
-    dot.classList.remove('is-hovering', 'is-text');
-    ring.classList.remove('is-hovering', 'is-text');
+  /* ── Shared: show/hide cursor elements ── */
+  function showCursor() {
+    if (isVisible) return;
+    isVisible = true;
+    [dot, ring, trail, blob].forEach(el => el.style.opacity = '1');
+  }
+  function hideCursor() {
+    isVisible = false;
+    [dot, ring, trail, blob].forEach(el => el.style.opacity = '0');
     label.classList.remove('visible');
-  });
+  }
 
-  /* ── Click: ripple + spark burst ── */
-  const SPARK_COLORS = ['#64d2ff', '#a88bfb', '#2dd4bf', '#fbbf24', '#fb7185'];
+  /* ── Shared: move dot instantly, ring/trail via lerp ── */
+  function setPos(x, y) { mx = x; my = y; }
 
-  document.addEventListener('click', e => {
-    /* Click state */
-    dot.classList.add('is-clicking');
-    ring.classList.add('is-clicking');
-    setTimeout(() => {
-      dot.classList.remove('is-clicking');
-      ring.classList.remove('is-clicking');
-    }, 200);
-
-    /* Ripple ring */
+  /* ── Shared: ripple + sparks ── */
+  const COLORS = ['#64d2ff','#a88bfb','#2dd4bf','#fbbf24','#fb7185'];
+  function burst(x, y, count = 12) {
+    /* Ripple */
     const rp = document.createElement('div');
     rp.className = 'cursor-ripple';
-    rp.style.cssText = `left:${e.clientX}px;top:${e.clientY}px;width:38px;height:38px;`;
+    rp.style.cssText = `left:${x}px;top:${y}px;width:38px;height:38px;`;
     document.body.appendChild(rp);
     setTimeout(() => rp.remove(), 700);
 
-    /* Spark particles */
-    const COUNT = 12;
-    for (let i = 0; i < COUNT; i++) {
-      const sp    = document.createElement('div');
+    /* Sparks */
+    for (let i = 0; i < count; i++) {
+      const sp = document.createElement('div');
       sp.className = 'cursor-spark';
-      const angle = (Math.PI * 2 / COUNT) * i + Math.random() * 0.5;
+      const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
       const dist  = 24 + Math.random() * 36;
       sp.style.cssText = `
-        left:${e.clientX}px;top:${e.clientY}px;
-        background:${SPARK_COLORS[i % SPARK_COLORS.length]};
+        left:${x}px;top:${y}px;
+        background:${COLORS[i % COLORS.length]};
         --dx:${Math.cos(angle) * dist}px;
         --dy:${Math.sin(angle) * dist}px;
         animation-duration:${0.45 + Math.random() * 0.35}s;
@@ -698,15 +633,180 @@
       document.body.appendChild(sp);
       setTimeout(() => sp.remove(), 900);
     }
-  });
+  }
 
-  /* ── Window visibility ── */
-  document.addEventListener('mouseleave', () => {
-    [dot, ring, trail, blob].forEach(el => el.style.opacity = '0');
-  });
-  document.addEventListener('mouseenter', () => {
-    [dot, ring, trail, blob].forEach(el => el.style.opacity = '1');
-  });
+  /* ── Click/tap state flash ── */
+  function clickState() {
+    dot.classList.add('is-clicking');
+    ring.classList.add('is-clicking');
+    setTimeout(() => {
+      dot.classList.remove('is-clicking');
+      ring.classList.remove('is-clicking');
+    }, 200);
+  }
+
+  /* ── rAF lerp loop (shared) ── */
+  const RING_EASE  = 0.11;
+  const TRAIL_EASE = 0.055;
+  const BLOB_EASE  = 0.055;
+
+  (function tick() {
+    /* Instant dot position */
+    dot.style.left = mx + 'px'; dot.style.top = my + 'px';
+
+    /* Lerped ring */
+    rx += (mx - rx) * RING_EASE; ry += (my - ry) * RING_EASE;
+    ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+
+    /* Lerped trail */
+    tx += (mx - tx) * TRAIL_EASE; ty += (my - ty) * TRAIL_EASE;
+    trail.style.left = tx + 'px'; trail.style.top = ty + 'px';
+
+    /* Lerped blob */
+    bx += (mx - bx) * BLOB_EASE; by += (my - by) * BLOB_EASE;
+    blob.style.left = bx + 'px'; blob.style.top = by + 'px';
+
+    requestAnimationFrame(tick);
+  })();
+
+  /* ══════════════════════════════════════════
+     DESKTOP — mouse events
+  ══════════════════════════════════════════ */
+  if (isMouse) {
+    const HOVER_SEL = 'a[href], button, [role="button"], .btn, .nav-link, .project-card, .badge, [data-magnetic]';
+    const TEXT_SEL  = 'input, textarea, [contenteditable]';
+    const ALL_SEL   = HOVER_SEL + ', ' + TEXT_SEL + ', label, select, .glass';
+
+    document.addEventListener('mousemove', e => {
+      setPos(e.clientX, e.clientY);
+      label.style.left = e.clientX + 'px';
+      label.style.top  = (e.clientY + 30) + 'px';
+      showCursor();
+    });
+
+    document.addEventListener('mouseover', e => {
+      const el = e.target.closest(ALL_SEL);
+      if (!el) return;
+      const isText = !!e.target.closest(TEXT_SEL);
+      dot.classList.toggle('is-text', isText);
+      ring.classList.toggle('is-text', isText);
+      dot.classList.toggle('is-hovering', !isText);
+      ring.classList.toggle('is-hovering', !isText);
+
+      const lbl = el.dataset.label || el.getAttribute('aria-label') || el.getAttribute('title');
+      if (lbl) { label.textContent = lbl; label.classList.add('visible'); }
+    });
+    document.addEventListener('mouseout', e => {
+      if (!e.target.closest(ALL_SEL)) return;
+      dot.classList.remove('is-hovering','is-text');
+      ring.classList.remove('is-hovering','is-text');
+      label.classList.remove('visible');
+    });
+
+    document.addEventListener('click', e => {
+      clickState();
+      burst(e.clientX, e.clientY);
+    });
+
+    document.addEventListener('mouseleave', hideCursor);
+    document.addEventListener('mouseenter', showCursor);
+
+    /* Magnetic */
+    const STRENGTH = 0.36;
+    document.querySelectorAll('[data-magnetic]').forEach(el => {
+      el.addEventListener('mousemove', e => {
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        el.style.transform = `translate(${(e.clientX-cx)*STRENGTH}px,${(e.clientY-cy)*STRENGTH}px)`;
+      });
+      el.addEventListener('mouseleave', () => { el.style.transform = ''; });
+    });
+  }
+
+  /* ══════════════════════════════════════════
+     MOBILE / TOUCH — touch events
+  ══════════════════════════════════════════ */
+  if (isTouch) {
+    /* Prevent default scroll only on our tracked finger */
+    let trackId = null;
+
+    document.addEventListener('touchstart', e => {
+      const t = e.changedTouches[0];
+      trackId = t.identifier;
+      setPos(t.clientX, t.clientY);
+
+      /* Sync lerped positions so ring doesn't fly in from off-screen */
+      rx = tx = bx = t.clientX;
+      ry = ty = by = t.clientY;
+
+      showCursor();
+      dot.classList.add('is-hovering');
+      ring.classList.add('is-hovering');
+
+      /* Long-press hold state */
+      holdTimer = setTimeout(() => {
+        dot.classList.remove('is-hovering');
+        ring.classList.remove('is-hovering');
+        dot.classList.add('is-holding');
+        ring.classList.add('is-holding');
+      }, 500);
+
+      /* Label: check tapped element */
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      if (el) {
+        const target = el.closest('[data-label],[aria-label],[title]');
+        if (target) {
+          const lbl = target.dataset.label || target.getAttribute('aria-label') || target.getAttribute('title');
+          if (lbl) {
+            label.textContent = lbl;
+            label.style.left = t.clientX + 'px';
+            label.style.top  = (t.clientY + 30) + 'px';
+            label.classList.add('visible');
+          }
+        }
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', e => {
+      const t = Array.from(e.changedTouches).find(x => x.identifier === trackId);
+      if (!t) return;
+      setPos(t.clientX, t.clientY);
+      label.style.left = t.clientX + 'px';
+      label.style.top  = (t.clientY + 30) + 'px';
+
+      /* Cancel hold if finger moved */
+      clearTimeout(holdTimer);
+      dot.classList.remove('is-holding');
+      ring.classList.remove('is-holding');
+    }, { passive: true });
+
+    document.addEventListener('touchend', e => {
+      const t = Array.from(e.changedTouches).find(x => x.identifier === trackId);
+      if (!t) return;
+      trackId = null;
+
+      clearTimeout(holdTimer);
+      const wasHolding = dot.classList.contains('is-holding');
+
+      dot.classList.remove('is-hovering','is-holding');
+      ring.classList.remove('is-hovering','is-holding');
+      label.classList.remove('visible');
+
+      /* Tap burst — fewer sparks on mobile for performance */
+      clickState();
+      burst(t.clientX, t.clientY, wasHolding ? 18 : 10);
+
+      /* Fade out after lift */
+      setTimeout(hideCursor, 600);
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', () => {
+      clearTimeout(holdTimer);
+      dot.classList.remove('is-hovering','is-holding');
+      ring.classList.remove('is-hovering','is-holding');
+      hideCursor();
+    }, { passive: true });
+  }
 })();
 </script>
 </body>
