@@ -59,7 +59,9 @@
             </div>
 
             <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">S.M.SAYED ARIFIN OMI</h1>
-            <h3 class="fs-4 mb-4 text-accent animate__animated animate__fadeInUp animate__delay-1s">Full-Stack Developer | .NET & Angular Specialist | AI Enthusiast | B.Sc. in CSE, AIUB</h3>
+            <h3  id="dynamic-text"  class="fs-4 mb-4 text-accent animate__animated animate__fadeInUp animate__delay-1s">
+                Full-Stack Developer | .NET & Angular Specialist | AI Enthusiast | B.Sc. in CSE, AIUB
+            </h3>
             
             <div class="d-flex justify-content-center gap-3 flex-wrap animate__animated animate__fadeInUp animate__delay-3s">
                 <a href="#contact" class="btn btn-primary btn-lg px-5 py-3">Contact Me</a>
@@ -808,6 +810,50 @@
     }, { passive: true });
   }
 })();
+</script>
+
+<script>
+  const roles = [
+    "Full-Stack Developer",
+    ".NET & Angular Specialist",
+    "AI Enthusiast",
+    "B.Sc. in CSE, AIUB"
+  ];
+
+  let roleIndex = 0;
+  let charIndex = 0;
+  let isDeleting = false;
+  const speed = 100;
+  const eraseSpeed = 50;
+  const delayBetween = 1500;
+
+  function typeEffect() {
+    const el = document.getElementById("dynamic-text");
+    const currentText = roles[roleIndex];
+
+    if (!isDeleting) {
+      el.textContent = currentText.substring(0, charIndex + 1);
+      charIndex++;
+
+      if (charIndex === currentText.length) {
+        isDeleting = true;
+        setTimeout(typeEffect, delayBetween);
+        return;
+      }
+    } else {
+      el.textContent = currentText.substring(0, charIndex - 1);
+      charIndex--;
+
+      if (charIndex === 0) {
+        isDeleting = false;
+        roleIndex = (roleIndex + 1) % roles.length;
+      }
+    }
+
+    setTimeout(typeEffect, isDeleting ? eraseSpeed : speed);
+  }
+
+  document.addEventListener("DOMContentLoaded", typeEffect);
 </script>
 </body>
 </html>

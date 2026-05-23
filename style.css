@@ -1322,3 +1322,34 @@ img { image-rendering: -webkit-optimize-contrast; }
   .cur-blob, .cur-label { display: none !important; }
   *, *::before, *::after { cursor: auto !important; }
 }
+/* Dynamic Typing Text */
+#dynamic-text {
+  min-height: 40px;
+  display: inline-block;
+  color: var(--electric) !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.03em;
+  text-shadow: 0 0 12px rgba(100, 210, 255, 0.25);
+}
+
+#dynamic-text::after {
+  content: "|";
+  color: var(--violet);
+  margin-left: 4px;
+  animation: blinkCursor 0.8s infinite;
+}
+
+@keyframes blinkCursor {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+#dynamic-text {
+  background: linear-gradient(135deg, var(--electric), var(--violet));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
